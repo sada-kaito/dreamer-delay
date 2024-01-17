@@ -133,40 +133,43 @@ class ActionDelay:
     
     def __init__(self, env, delay_step):
         self.env = env
-        self.action_list = np.zeros(delay_step)
-        print(self.action_list)
-        self.obs_list = np.zeros(delay_step)
+        self.action_buffer = np.zeros(delay_step)
+        self.obs_buffer = np.zeros(delay_step)
+        self.step_number = 0
         
     def __getattr__(self, name):
         return getattr(self.env, name)
     
     def step(self, action):
-        self.action_list = np.append(self.action_list, action)
-        action = [self.action_list[0]]
+        self.action_buffer = np.append(self.action_buffer, action)
+        action = [self.action_buffer[0]]
         action = np.array(action)
-        self.action_list = np.delete(self.action_list, 0)
+        self.action_buffer = np.delete(self.action_buffer, 0)
         obs, reward, done = self.env.step(action)
-        self.obs_list = np.append(self.obs_list, obs)
-        obs_element = self.obs_list[0]
+        self.step_number += 1
+        self.obs_buffer = np.append(self.obs_buffer, obs)
+        obs_element = self.obs_buffer[0]
         if obs_element==0:
+            obs_delay = {}
             for key in obs.keys():
-                obs[key] = np.zeros_like(obs[key])
+                obs_delay[key] = np.zeros_like(obs[key])
         else:
-            obs = self.obs_list[0]
-        self.obs_list = np.delete(self.obs_list, 0)
-        return obs, reward, done
+            obs_delay = self.obs_buffer[0]
+        self.obs_buffer = np.delete(self.obs_buffer, 0)
+        return obs_delay, reward, done
     
     def reset(self):
         obs = self.env.reset()
-        self.obs_list = np.append(self.obs_list, obs)
-        obs_element = self.obs_list[0]
+        self.obs_buffer = np.append(self.obs_buffer, obs)
+        obs_element = self.obs_buffer[0]
         if obs_element==0:
+            obs_delay = {}
             for key in obs.keys():
-                obs[key] = np.zeros_like(obs[key])
+                obs_delay[key] = np.zeros_like(obs[key])
         else:
-            obs = self.obs_list[0]
-        self.obs_list = np.delete(self.obs_list, 0)
-        return obs
+            obs_delay = self.obs_buffer[0]
+        self.obs_buffer = np.delete(self.obs_buffer, 0)
+        return obs_delay
 
 
 # step毎に得られるobs,rewardを保存しておく．1エピソード毎に別ファイルに保存される．
@@ -242,35 +245,6 @@ class RewardObs:
         obs['reward'] = 0.0
         return obs
 
-
-# class ActionDelay:
-    
-#     def __init__(self, env, delay_step):
-#         self.env = env
-#         self.action_list = np.zeros(delay_step)
-#         self.obs_list = np.zeros(delay_step)
-        
-#     def __getattr__(self, name):
-#         return getattr(self.env, name)
-    
-#     def step(self, action):
-#         self.action_list = np.append(self.action_list, action)
-#         action = [self.action_list[0]]
-#         action = np.array(action)
-#         self.action_list = np.delete(self.action_list, 0)
-#         obs, reward, done = self.env.step(action)
-#         self.obs_list = np.append(self.obs_list, obs)
-#         obs_element = self.obs_list[0]
-#         if obs_element==0:
-#             print(obs_element)
-#             for key in obs.keys():
-#                 obs[key] = np.zeros_like(obs[key])
-#             print(obs)
-#         else:
-#             obs = self.obs_list[0]
-#         self.obs_list = np.delete(self.obs_list, 0)
-#         print(obs)
-#         return obs, reward, done
 
 
 

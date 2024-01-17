@@ -269,6 +269,8 @@ def make_env(config, writer, prefix, datadir, store):
     env = wrappers_delay.ActionRepeat(env, config.action_count)
     env = wrappers_delay.NormalizeActions(env)
     env = wrappers_delay.TimeLimit(env, config.time_limit / config.action_count)
+    if config.delay_step != 0:
+        env = wrappers_delay.ActionDelay(env, config.delay_step)
     callbacks = []
     if store:
         callbacks.append(lambda ep: tools_delay.save_episodes(datadir, [ep]))

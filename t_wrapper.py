@@ -16,6 +16,7 @@ def make_env(config, datadir, store):
     env = wrappers_delay.NormalizeActions(env)
     env = wrappers_delay.TimeLimit(env, config.time_limit / config.action_count)
     if config.delay_step != 0:
+        print(config.delay_step)
         env = wrappers_delay.ActionDelay(env, config.delay_step)
     callbacks = []
     if store:
@@ -31,19 +32,17 @@ done = None
 
 while not done:
 # for i in range(5):
-    action = [1]
+    action = np.ones((1,1))
     action = tf.reshape(action, (1,1))
     action = np.array(action)
     # print(action)
     obs, _, done = env.step(action[0])
-    print(f"obs:{obs}")
-    print(f"action: {action}")
     
-file_path = './episodes/20240117-1628-daca5485-501.npz'
+# file_path = './episodes/20240117-2052-a6743c6e-251.npz'
 
-data = np.load(file_path)
-for k, v in data.items():
-    print(k)
-    print(v.shape)
-    print(v[0:5])
+# data = np.load(file_path)
+# for k, v in data.items():
+#     print(k)
+#     print(v.shape)
+#     print(v[0:5])
     
