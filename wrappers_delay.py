@@ -40,7 +40,7 @@ class DeepMindControl:
         theta = np.arctan2(obs['orientation'][1], obs['orientation'][0])
         reward_error = 1 - abs(theta)/np.pi
         reward_energy = - abs(action[0]) + 1
-        reward = (reward_error * 6/10) + (reward_energy * 4/10)
+        reward = (reward_error * 9.9/10) + (reward_energy * 0.1/10)
         reward = reward or 0
         done = time_step.last()
         return obs, reward, done

@@ -4,6 +4,7 @@ import pathlib
 import json
 import os
 import time
+from dm_control import suite
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
 os.environ['MUJOCO_GL'] = 'egl'
@@ -48,9 +49,9 @@ def define_config():
     config.kl_scale = 1.0
     
     # Training
-    config.batch_size = 5
-    config.batch_length = 5
-    config.train_steps = 1
+    config.batch_size = 50
+    config.batch_length = 50
+    config.train_steps = 100
     config.model_lr = 6e-4
     config.value_lr = 8e-5
     config.actor_lr = 8e-5
@@ -154,14 +155,13 @@ class Dreamer(tf.keras.Model):
         else:
             latent, action = state
         embed = self.encoder(preprocess(obs, self.c))
-        embed = tf.reshape(embed, (1,200))
         latent, _ = self.dynamics.obs_step(latent, action, embed)
         feat = self.dynamics.get_feat(latent)
         if training:
             action = self.actor(feat).sample()
         else:
             action = self.actor(feat).mode()
-        action = tf.reshape(action, (1,1))
+        action = tf.reshape(action, (1, self.act_dim))
         state = (latent, action)
         return action, state
 

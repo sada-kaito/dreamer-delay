@@ -70,11 +70,12 @@ class Adam(tf.Module):
 def save_episodes(directory, episodes):
     directory = pathlib.Path(directory).expanduser()
     directory.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.datetime.now().strftime('%Y%m%d-%H%M')
+    timestamp = datetime.datetime.now().strftime('%Y%m%d')
     for episode in episodes:
         identifer = str(uuid.uuid4().hex)[:8]
         length = len(episode['reward'])
-        file = directory / f'{timestamp}-{identifer}-{length}.npz'
+        reward = int(episode['reward'].sum())
+        file = directory / f'{timestamp}-{identifer}-{reward}-{length}.npz'
         with io.BytesIO() as f1:
             np.savez_compressed(f1, **episode)
             f1.seek(0)
