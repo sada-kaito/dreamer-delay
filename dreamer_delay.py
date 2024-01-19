@@ -4,6 +4,7 @@ import pathlib
 import json
 import os
 import time
+from dm_control import suite
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
 os.environ['MUJOCO_GL'] = 'egl'
@@ -161,7 +162,7 @@ class Dreamer(tf.keras.Model):
             action = self.actor(feat).sample()
         else:
             action = self.actor(feat).mode()
-        action = tf.reshape(action, (1,1))
+        action = tf.reshape(action, (1, self.act_dim))
         state = (latent, action)
         return action, state
 
