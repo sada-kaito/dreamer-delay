@@ -70,7 +70,7 @@ class Adam(tf.Module):
 def save_episodes(directory, episodes):
     directory = pathlib.Path(directory).expanduser()
     directory.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.datetime.now().strftime('%Y%m%d-%H%M')
+    timestamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
     for episode in episodes:
         identifer = str(uuid.uuid4().hex)[:8]
         length = len(episode['reward'])
