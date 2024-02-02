@@ -12,7 +12,7 @@ env = suite.load(domain_name="walker", task_name="walk")
 time_step = env.reset()
 print(time_step)
 plt.imshow(env.physics.render())
-
+print(dir(env.physics))
 # 環境内でランダムなアクションを100ステップ実行します。
 for _ in range(100):
     # action = np.random.uniform(low=-2.0, high=2.0, size=env.action_spec().shape)
@@ -36,6 +36,7 @@ for _ in range(100):
     # print(f"velocity:  {time_step[3]['velocity']}")
     # print()
     # 現在の状態を描画します。
+    print(env.physics.timestep())
     plt.axis('off')
     plt.imshow(env.physics.render(camera_id='side'))
     plt.pause(0.001)  # 少し待機して画像を見えるようにします。

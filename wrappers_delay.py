@@ -3,13 +3,14 @@ import numpy as np
 
 class DeepMindControl:
     
-    def __init__(self, domain, task, size=(64, 64), camera=None):
+    def __init__(self, domain, task, reward_type, size=(64, 64), camera=None):
         if isinstance(domain, str):
             from dm_control import suite
             self.env = suite.load(domain, task)
         else:
             assert task is None
             self.env = domain()
+        self.reward_type = reward_type
         self.size = size
         if camera is None:
             camera = dict(quadruped=2).get(domain, 0)
@@ -34,13 +35,18 @@ class DeepMindControl:
         return gym.spaces.Box(spec.minimum, spec.maximum, dtype=np.float32)
     
     def step(self, action):
+        # self.env.physics.data.qpos = 3.141592
+        # print(self.env.physics.data.qpos)
         time_step = self.env.step(action)
         obs = dict(time_step.observation)
         obs['image'] = self.render()
-        theta = np.arctan2(obs['orientation'][1], obs['orientation'][0])
-        reward_error = 1 - abs(theta)/np.pi
-        reward_energy = - abs(action[0]) + 1
-        reward = (reward_error * 9.9/10) + (reward_energy * 0.1/10)
+        if self.reward_type == 'original':
+            reward = time_step.reward
+        elif self.reward_type == 'pendulum':
+            theta = np.arctan2(obs['orientation'][1], obs['orientation'][0])
+            reward_error = 1 - abs(theta)/np.pi
+            reward_energy = - abs(action[0]) + 1
+            reward = (reward_error * 9.9/10) + (reward_energy * 0.1/10)
         reward = reward or 0
         done = time_step.last()
         return obs, reward, done
@@ -56,6 +62,28 @@ class DeepMindControl:
             raise ValueError("Only render mode 'rgb_array' is supported.")
         return self.env.physics.render(*self.size, camera_id=self.camera)       
     
+
+    
+class ActionDelay:
+    
+    def __init__(self, env, delay_step):
+        self.env = env
+        self.act_dim = self.env.action_space.shape[0]
+        self.first_act = np.zeros(self.act_dim)
+        self.act_buffer = []
+        for i in range(delay_step):
+            self.act_buffer = np.append(self.act_buffer, self.first_act)
+        
+    def __getattr__(self, name):
+        return getattr(self.env, name)
+    
+    def step(self, action):
+        self.act_buffer = np.append(self.act_buffer, action)
+        action = [self.act_buffer[0:self.act_dim]]
+        action = np.array(action)
+        self.act_buffer = np.delete(self.act_buffer, np.s_[0:self.act_dim])
+        obs, reward, done = self.env.step(action)
+        return obs, reward, done
 
 class ActionRepeat:
     
@@ -128,49 +156,6 @@ class TimeLimit:
         self._step = 0
         return self.env.reset()
     
-
-class ActionDelay:
-    
-    def __init__(self, env, delay_step):
-        self.env = env
-        self.action_buffer = np.zeros(delay_step)
-        self.obs_buffer = np.zeros(delay_step)
-        self.step_number = 0
-        
-    def __getattr__(self, name):
-        return getattr(self.env, name)
-    
-    def step(self, action):
-        self.action_buffer = np.append(self.action_buffer, action)
-        action = [self.action_buffer[0]]
-        action = np.array(action)
-        self.action_buffer = np.delete(self.action_buffer, 0)
-        obs, reward, done = self.env.step(action)
-        self.step_number += 1
-        self.obs_buffer = np.append(self.obs_buffer, obs)
-        obs_element = self.obs_buffer[0]
-        if obs_element==0:
-            obs_delay = {}
-            for key in obs.keys():
-                obs_delay[key] = np.zeros_like(obs[key])
-        else:
-            obs_delay = self.obs_buffer[0]
-        self.obs_buffer = np.delete(self.obs_buffer, 0)
-        return obs_delay, reward, done
-    
-    def reset(self):
-        obs = self.env.reset()
-        self.obs_buffer = np.append(self.obs_buffer, obs)
-        obs_element = self.obs_buffer[0]
-        if obs_element==0:
-            obs_delay = {}
-            for key in obs.keys():
-                obs_delay[key] = np.zeros_like(obs[key])
-        else:
-            obs_delay = self.obs_buffer[0]
-        self.obs_buffer = np.delete(self.obs_buffer, 0)
-        return obs_delay
-
 
 # step毎に得られるobs,rewardを保存しておく．1エピソード毎に別ファイルに保存される．
 class Collect:

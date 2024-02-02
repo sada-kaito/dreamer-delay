@@ -8,10 +8,10 @@ from tensorflow.keras.mixed_precision import global_policy
 from tensorflow.keras.mixed_precision import set_global_policy
 from tensorflow.keras.mixed_precision import Policy
 
-import dreamer_repro
+import dreamer_delay
 set_global_policy(Policy('mixed_float16'))
 
-config = dreamer_repro.define_config()
+config = dreamer_delay.define_config()
 
 config.batch_length = 50
 config.batch_size = 1
@@ -20,12 +20,11 @@ config.train_steps = 1
 datadir = config.logdir / 'episodes'
 checkpointdir = config.logdir / 'checkpoints'
 actspace = gym.spaces.Box(-1, 1, (6,), dtype=np.float32)
-# print(config.batch_length)
-agent = dreamer_repro.Dreamer(config, datadir, actspace, writer=None)
+# imgageであればstatespaceは適当でいい
+statespace = None
+agent = dreamer_delay.Dreamer(config, datadir, actspace, statespace, writer=None)
 # 重みのload
 agent.load()
-
-
 
 def show_images(images, pause_time=0.04):
     # global t

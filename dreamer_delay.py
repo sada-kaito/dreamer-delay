@@ -39,7 +39,11 @@ def define_config():
     config.domain = 'pendulum'
     config.task = 'swingup'
     config.action_count = 2
-    config.delay_step = 1
+    config.delay_step = 2
+    config.encoder_type = "image" # "image", "proprioception"
+    config.reward_type = "pendulum" # "original", "pendulum"
+    config.camera = "side"
+    
     config.time_limit = 1000
     config.prefill = 5000
     config.clip_rewards = 'none'
@@ -81,8 +85,12 @@ class Dreamer(tf.keras.Model):
         self.build_model()
     
     def build_model(self):
-        self.encoder = models_delay.DenseEncoder()
-        self.decoder = models_delay.DenseDecoder(self.state_dim)
+        if self.c.encoder_type == "image":
+            self.encoder = models_delay.ConvEncoder()
+            self.decoder = models_delay.ConvDecoder()
+        elif self.c.encoder_type == "proprioception":
+            self.encoder = models_delay.DenseEncoder()
+            self.decoder = models_delay.DenseDecoder(self.state_dim)
         self.dynamics = models_delay.RSSM()
         self.reward = models_delay.RewardDecoder()
         self.value = models_delay.ValueNetwork()
@@ -107,11 +115,15 @@ class Dreamer(tf.keras.Model):
             image_pred = self.decoder(feat)
             reward_pred = self.reward(feat)
             likes = tools_delay.AttrDict()
-            obs = {k: v for k, v in data.items() if k not in ['image','reward','action']}
-            for k, v in obs.items():
-                if len(v.shape)==2:
-                    obs[k] = tf.expand_dims(v, axis=-1)
-            obs = tf.concat(list(obs.values()), axis=-1)
+            if self.c.encoder_type == "image":
+                obs = data['image']
+            if self.c.encoder_type == "proprioception":
+                exclude_list = ['image','reward','action']
+                obs = {k: v for k, v in data.items() if k not in exclude_list}
+                for k, v in obs.items():
+                    if len(v.shape)==2:
+                        obs[k] = tf.expand_dims(v, axis=-1)
+                obs = tf.concat(list(obs.values()), axis=-1)
             likes.obs = tf.reduce_mean(image_pred.log_prob(obs))
             likes.reward = tf.reduce_mean(reward_pred.log_prob(data['reward']))
             prior_dist = self.dynamics.get_dist(prior)
@@ -155,6 +167,8 @@ class Dreamer(tf.keras.Model):
         else:
             latent, action = state
         embed = self.encoder(preprocess(obs, self.c))
+        if tf.rank(embed) == 1:
+            embed = tf.reshape(embed, (1,1024))
         latent, _ = self.dynamics.obs_step(latent, action, embed)
         feat = self.dynamics.get_feat(latent)
         if training:
@@ -250,7 +264,6 @@ def load_dataset(directory, config):
 def count_steps(datadir, config):
   return tools_delay.count_episodes(datadir)[1] * config.action_count
 
-
 def summarize_episode(episode, config, datadir, writer, prefix):
     episodes, steps = tools_delay.count_episodes(datadir)
     length = (len(episode['reward']) - 1) * config.action_count
@@ -265,12 +278,13 @@ def summarize_episode(episode, config, datadir, writer, prefix):
         [tf.summary.scalar('sim/' + k, v) for k, v in metrics]
 
 def make_env(config, writer, prefix, datadir, store):
-    env = wrappers_delay.DeepMindControl(config.domain, config.task, camera='side')
-    env = wrappers_delay.ActionRepeat(env, config.action_count)
+    c = config
+    env = wrappers_delay.DeepMindControl(c.domain, c.task, c.reward_type, camera=c.camera)
+    if c.delay_step != 0:
+        env = wrappers_delay.ActionDelay(env, c.delay_step)
+    env = wrappers_delay.ActionRepeat(env, c.action_count)
     env = wrappers_delay.NormalizeActions(env)
-    env = wrappers_delay.TimeLimit(env, config.time_limit / config.action_count)
-    if config.delay_step != 0:
-        env = wrappers_delay.ActionDelay(env, config.delay_step)
+    env = wrappers_delay.TimeLimit(env, c.time_limit / c.action_count)
     callbacks = []
     if store:
         callbacks.append(lambda ep: tools_delay.save_episodes(datadir, [ep]))
@@ -279,9 +293,6 @@ def make_env(config, writer, prefix, datadir, store):
     env = wrappers_delay.Collect(env, callbacks, config.precision)
     env = wrappers_delay.RewardObs(env)
     return env
-    
-
-set_global_policy(Policy('mixed_float16'))
 
 config = define_config()
 
@@ -317,8 +328,11 @@ def main(config):
     agent = Dreamer(config, datadir, act_space, state_space, writer)
     
     if config.load_model:
-        print('load')
-        agent.load()
+        if os.path.exists("weights"):
+            print('load')
+            agent.load()
+        else:
+            print("weights file not exists.")
         
     state = None
     done = None
